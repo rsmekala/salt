@@ -519,7 +519,7 @@ def commit_check(name):
     return ret
 
 
-def get_table(name, table, file, path=None, target=None, key=None,
+def get_table(name, table, table_file, path=None, target=None, key=None,
               key_items=None, filters=None, args=None):
     '''
     Retrieve data from a Junos device using Tables/Views
@@ -539,7 +539,7 @@ def get_table(name, table, file, path=None, target=None, key=None,
           task definition
         * table:
           Name of PyEZ Table
-        * file:
+        * table_file:
           YAML file that has the table specified in table parameter
       Optional
         * path:
@@ -557,6 +557,6 @@ def get_table(name, table, file, path=None, target=None, key=None,
           key/value pair which should render Jinja template command
     '''
     ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
-    ret['changes'] = __salt__['junos.get_table'](table, file, path, target,
+    ret['changes'] = __salt__['junos.get_table'](table, table_file, path, target,
                                                  key, key_items, filters, args)
     return ret

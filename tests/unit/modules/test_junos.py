@@ -3,8 +3,8 @@
     :codeauthor: :email:`Rajvi Dhimar <rajvidhimar95@gmail.com>`
 '''
 # Import python libs
-import os
 from __future__ import absolute_import, print_function, unicode_literals
+import os
 
 # Import test libs
 from tests.support.mixins import LoaderModuleMockMixin, XMLEqualityMixin
