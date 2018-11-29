@@ -32,17 +32,16 @@ def resultdecorator(function):
 
 
 @resultdecorator
-def rpc(name, dest=None, format='xml', args=None, **kwargs):
+def rpc(name, rpc, dest=None, **kwargs):
     '''
     Executes the given rpc. The returned data can be stored in a file
     by specifying the destination path with dest as an argument
 
     .. code-block:: yaml
 
-        get-interface-information:
-            junos:
-              - rpc
-              - dest: /home/user/rpc.log
+        Get interface information:
+            junos.rpc:
+              - rpc: get-interface-information
               - interface_name: lo0
 
 
@@ -71,28 +70,20 @@ def rpc(name, dest=None, format='xml', args=None, **kwargs):
               Name of the interface whose information you want.
     '''
     ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
-    if args is not None:
-        ret['changes'] = __salt__['junos.rpc'](
-            name,
-            dest,
-            format,
-            *args,
-            **kwargs)
-    else:
-        ret['changes'] = __salt__['junos.rpc'](name, dest, format, **kwargs)
+    ret['changes'] = __salt__['junos.rpc'](rpc, dest, **kwargs)
     return ret
 
 
 @resultdecorator
-def set_hostname(name, **kwargs):
+def set_hostname(name, hostname, **kwargs):
     '''
     Changes the hostname of the device.
 
     .. code-block:: yaml
 
-            device_name:
-              junos:
-                - set_hostname
+            Change host name:
+              junos.set_hostname:
+                - hostname: device_name
                 - comment: "Host-name set via saltstack."
 
 
@@ -113,7 +104,7 @@ def set_hostname(name, **kwargs):
 
     '''
     ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
-    ret['changes'] = __salt__['junos.set_hostname'](name, **kwargs)
+    ret['changes'] = __salt__['junos.set_hostname'](hostname, **kwargs)
     return ret
 
 
@@ -162,7 +153,7 @@ def commit(name, **kwargs):
 
 
 @resultdecorator
-def rollback(name, id, **kwargs):
+def rollback(name, **kwargs):
     '''
     Rollbacks the committed changes.
 
@@ -192,12 +183,12 @@ def rollback(name, id, **kwargs):
 
     '''
     ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
-    ret['changes'] = __salt__['junos.rollback'](id, **kwargs)
+    ret['changes'] = __salt__['junos.rollback'](**kwargs)
     return ret
 
 
 @resultdecorator
-def diff(name, d_id):
+def diff(name, **kwargs):
     '''
     Gets the difference between the candidate and the current configuration.
 
@@ -214,21 +205,20 @@ def diff(name, d_id):
           The rollback id value [0-49]. (default = 0)
     '''
     ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
-    ret['changes'] = __salt__['junos.diff'](d_id)
+    ret['changes'] = __salt__['junos.diff'](**kwargs)
     return ret
 
 
 @resultdecorator
-def cli(name, format='text', **kwargs):
+def cli(name, command, **kwargs):
     '''
     Executes the CLI commands and reuturns the text output.
 
     .. code-block:: yaml
 
-            show version:
-              junos:
-                - cli
-                - format: xml
+            Execute CLI command:
+              junos.cli:
+                - command: show version
 
     Parameters:
       Required
@@ -247,7 +237,7 @@ def cli(name, format='text', **kwargs):
                (default = None)
     '''
     ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
-    ret['changes'] = __salt__['junos.cli'](name, format, **kwargs)
+    ret['changes'] = __salt__['junos.cli'](command, **kwargs)
     return ret
 
 
@@ -279,7 +269,7 @@ def shutdown(name, **kwargs):
 
 
 @resultdecorator
-def install_config(name, **kwargs):
+def install_config(name, path, **kwargs):
     '''
     Loads and commits the configuration provided.
 
@@ -305,7 +295,7 @@ def install_config(name, **kwargs):
                     description: Creating interface via SaltStack.
 
 
-    name
+    path
         Path where the configuration/template file is present. If the file has
         a ``*.conf`` extension, the content is treated as text format. If the
         file has a ``*.xml`` extension, the content is treated as XML format. If
@@ -346,7 +336,7 @@ def install_config(name, **kwargs):
 
     '''
     ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
-    ret['changes'] = __salt__['junos.install_config'](name, **kwargs)
+    ret['changes'] = __salt__['junos.install_config'](path, **kwargs)
     return ret
 
 
@@ -368,7 +358,7 @@ def zeroize(name):
 
 
 @resultdecorator
-def install_os(name, **kwargs):
+def install_os(name, path, **kwargs):
     '''
     Installs the given image on the device. After the installation is complete
     the device is rebooted, if reboot=True is given as a keyworded argument.
@@ -399,12 +389,12 @@ def install_os(name, **kwargs):
 
     '''
     ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
-    ret['changes'] = __salt__['junos.install_os'](name, **kwargs)
+    ret['changes'] = __salt__['junos.install_os'](path, **kwargs)
     return ret
 
 
 @resultdecorator
-def file_copy(name, dest=None, **kwargs):
+def file_copy(name, src, dest, **kwargs):
     '''
     Copies the file from the local device to the junos device.
 
@@ -423,7 +413,7 @@ def file_copy(name, dest=None, **kwargs):
           The destination path where the file will be copied.
     '''
     ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
-    ret['changes'] = __salt__['junos.file_copy'](name, dest, **kwargs)
+    ret['changes'] = __salt__['junos.file_copy'](src, dest, **kwargs)
     return ret
 
 
@@ -466,16 +456,15 @@ def unlock(name):
 
 
 @resultdecorator
-def load(name, **kwargs):
+def load(name, path, **kwargs):
     '''
     Loads the configuration provided onto the junos device.
 
     .. code-block:: yaml
 
-            Install the mentioned config:
-              junos:
-                - load
-                - path: salt//configs/interface.set
+           Install the mentioned config:
+             junos.load:
+               - path: salt://config.set
 
     .. code-block:: yaml
 
@@ -488,7 +477,7 @@ def load(name, **kwargs):
                     description: Creating interface via SaltStack.
 
 
-    name
+    path
         Path where the configuration/template file is present. If the file has
         a ``*.conf`` extension, the content is treated as text format. If the
         file has a ``*.xml`` extension, the content is treated as XML format. If
@@ -523,7 +512,7 @@ def load(name, **kwargs):
 
     '''
     ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
-    ret['changes'] = __salt__['junos.load'](name, **kwargs)
+    ret['changes'] = __salt__['junos.load'](path, **kwargs)
     return ret
 
 
@@ -541,4 +530,41 @@ def commit_check(name):
     '''
     ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
     ret['changes'] = __salt__['junos.commit_check']()
+    return ret
+
+@resultdecorator
+def get_table(name, table, table_file, **kwargs):
+    '''
+    Retrieve data from a Junos device using Tables/Views
+    .. code-block:: yaml
+        get route details:
+            junos:
+              - get_table
+              - table: RouteTable
+              - file: routes.yml
+    Parameters:
+      Required
+        * name:
+          task definition
+        * table:
+          Name of PyEZ Table
+        * file:
+          YAML file that has the table specified in table parameter
+      Optional
+        * path:
+          Path of location of the YAML file.
+          defaults to op directory in jnpr.junos.op
+        * target:
+          if command need to run on FPC, can specify fpc target
+        * key:
+          To overwrite key provided in YAML
+        * key_items:
+          To select only given key items
+        * filters:
+          To select only filter for the dictionary from columns
+        * args:
+          key/value pair which should render Jinja template command
+    '''
+    ret = {'name': name, 'changes': {}, 'result': True, 'comment': ''}
+    ret['changes'] = __salt__['junos.get_table'](table, table_file, **kwargs)
     return ret
