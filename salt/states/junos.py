@@ -20,10 +20,26 @@ from functools import wraps
 
 log = logging.getLogger()
 
+# State module keyword arguments changes
+changes = {'rpc': 'rpc',
+           'set_hostname': 'hostname',
+           'cli': 'command',
+           'install_config': 'path',
+           'install_os': 'path',
+           'file_copy': 'src',
+           'load': 'path',
+           }
+
 
 def resultdecorator(function):
     @wraps(function)
     def wrapper(*args, **kwargs):
+        param_name = changes[function.__name__]
+        if param_name not in kwargs:
+            kwargs[param_name] = kwargs['name']
+
+        log.critical(kwargs)
+
         ret = function(*args, **kwargs)
         ret['result'] = ret['changes']['out']
         return ret
