@@ -112,20 +112,20 @@ def init(opts):
     proxy_keys = opts['proxy'].keys()
 
     # If encoded_passwd is found, prefer it over passwd or password
-    if 'encoded_password' in opts['proxy'].keys() and HAS_JUNOSSECURE:
-        try:
-            decoded_password = junos_decode(opts['proxy'].pop('encoded_password'))
-            opts['proxy'].pop('passwd', None)
-            opts['proxy'].pop('password', None)
-            opts['proxy']['passwd'] = decoded_password
-            log.error('')
-        except EncodeDecodeError:
-            log.error('Unable to decode encoded_password, proceeding with passwd or password')
+    if 'encoded_password' in opts['proxy'].keys():
+        if HAS_JUNOSSECURE:
+            try:
+                decoded_password = junos_decode(opts['proxy'].pop('encoded_password'))
+                opts['proxy'].pop('passwd', None)
+                opts['proxy'].pop('password', None)
+                opts['proxy']['passwd'] = decoded_password
+            except EncodeDecodeError:
+                log.error('Unable to decode encoded_password, proceeding with passwd or password')
     # Proceeding with plain text password options as junossecure package not found
-    elif 'encoded_password' in opts['proxy'].keys() and not HAS_JUNOSSECURE:
-        opts['proxy'].pop('encoded_password')
-        log.error('encoded_password option provided, but could not find junossecure option to decode.'
-                  ' Proceeding with passwd or password options if provided.')
+        else:
+            opts['proxy'].pop('encoded_password')
+            log.error('encoded_password option provided, but could not find junossecure option to'
+                      'decode. Proceeding with passwd or password options if provided.')
 
     for arg in optional_args:
         if arg in proxy_keys:
