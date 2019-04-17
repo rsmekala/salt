@@ -125,7 +125,7 @@ def init(opts):
         else:
             opts['proxy'].pop('encoded_password')
             log.error('encoded_password option provided, but could not find junossecure option to'
-                      'decode. Proceeding with passwd or password options if provided.')
+                      ' decode. Proceeding with passwd or password options if provided.')
 
     for arg in optional_args:
         if arg in proxy_keys:
