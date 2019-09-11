@@ -5,11 +5,6 @@ Module to interact with Junos devices.
 :maturity: new
 :dependencies: junos-eznc, jxmlease
 
-.. note::
-
-    Those who wish to use junos-eznc (PyEZ) version >= 2.1.0, must
-    use the latest salt code from github until the next release.
-
 Refer to :mod:`junos <salt.proxy.junos>` for information on connecting to junos proxy.
 
 '''
@@ -190,9 +185,9 @@ def rpc(cmd=None, **kwargs):
 
     .. code-block:: bash
 
-        salt 'device' junos.rpc get_config dest=/var/log/config.txt format=text filter='<configuration><system/></configuration>'
-        salt 'device' junos.rpc get-interface-information dest=/home/user/interface.xml interface_name='lo0' terse=True
-        salt 'device' junos.rpc get-chassis-inventory
+        salt 'device_name' junos.rpc get_config dest=/var/log/config.txt format=text filter='<configuration><system/></configuration>'
+        salt 'device_name' junos.rpc get-interface-information dest=/home/user/interface.xml interface_name='lo0' terse=True
+        salt 'device_name' junos.rpc get-chassis-inventory
     '''
 
     conn = __proxy__['junos.conn']()
@@ -269,6 +264,8 @@ def rpc(cmd=None, **kwargs):
         # Earlier it was ret['message']
         ret['rpc_reply'] = jxmlease.parse(etree.tostring(reply))
 
+    # The file is written only on the minion. use cp.push
+    # to copy the file onto master
     if dest:
         if format_ == 'text':
             write_response = reply.text
@@ -505,6 +502,8 @@ def rollback(**kwargs):
 
     if 'diffs_file' in op and op['diffs_file'] is not None:
         diff = conn.cu.diff()
+        # The file is written only on the minion. use cp.push
+        # to copy the file onto master
         if diff is not None:
             with salt.utils.files.fopen(op['diffs_file'], 'w') as fp:
                 fp.write(salt.utils.stringutils.to_str(diff))
@@ -691,6 +690,8 @@ def cli(command=None, **kwargs):
         result = etree.tostring(result)
         ret['message'] = jxmlease.parse(result)
 
+    # The file is written only on the minion. use cp.push
+    # to copy the file onto master
     if 'dest' in op and op['dest'] is not None:
         try:
             with salt.utils.files.fopen(op['dest'], 'w') as fp:
@@ -786,7 +787,7 @@ def install_config(path=None, **kwargs):
     Commits the changes if the commit checks or throws an error.
 
     path (required)
-        Path where the configuration/template file is present. If the file has
+        Path where the configuration/template file is present on master. If the file has
         a ``.conf`` extension, the content is treated as text format. If the
         file has a ``.xml`` extension, the content is treated as XML format. If
         the file has a ``.set`` extension, the content is treated as Junos OS
@@ -877,6 +878,9 @@ def install_config(path=None, **kwargs):
         template_vars = op["template_vars"]
 
     try:
+        # We cannot use cache_file here as this needs to be rendered
+        # on every run unlike cache_file. Also there is no module as
+        # cache_template
         template_cached_path = salt.utils.files.mkstemp()
         __salt__['cp.get_template'](
             path,
@@ -898,6 +902,8 @@ def install_config(path=None, **kwargs):
         ret['out'] = False
         return ret
 
+    # The file is written only on the minion. use cp.push
+    # to copy the file onto master
     write_diff = ''
     if 'diffs_file' in op and op['diffs_file'] is not None:
         write_diff = op['diffs_file']
@@ -915,6 +921,7 @@ def install_config(path=None, **kwargs):
 
         op['format'] = template_format
 
+    # TODO: document the default behaviour of the commit operation
     if 'replace' in op and op['replace']:
         op['merge'] = False
         del op['replace']
@@ -943,6 +950,7 @@ def install_config(path=None, **kwargs):
                 return ret
 
             finally:
+                # Remove the temp file.
                 salt.utils.files.safe_rm(template_cached_path)
 
             if db_mode != 'dynamic':
@@ -991,6 +999,8 @@ def install_config(path=None, **kwargs):
                 ret['out'] = True
 
             try:
+                # The file is written only on the minion. use cp.push
+                # to copy the file onto master
                 if write_diff and config_diff is not None:
                     with salt.utils.files.fopen(write_diff, 'w') as fp:
                         fp.write(salt.utils.stringutils.to_str(config_diff))
@@ -1047,7 +1057,7 @@ def install_os(path=None, **kwargs):
     the device is rebooted, if reboot=True is given as a keyworded argument.
 
     path (required)
-        Path where the image file is present on the proxy minion
+        Path where the image file is present on the master
 
     remote_path : /var/tmp
         If the value of path  is a file path on the local
@@ -1133,10 +1143,12 @@ def install_os(path=None, **kwargs):
     if not no_copy_:
         # To handle invalid image path scenario
         try:
-            image_cached_path = salt.utils.files.mkstemp()
-            __salt__['cp.get_file'](path, image_cached_path)
+            # cache_file is better suited here than get_file
+            image_cached_path = __salt__['cp.cache_file'](path)
 
-            if not os.path.isfile(image_cached_path):
+            # If it wasn't able find the file on master, it will return false
+            # else the cache path
+            if not image_cached_path and not os.path.isfile(image_cached_path):
                 ret['message'] = 'Invalid image path.'
                 ret['out'] = False
                 return ret
@@ -1159,9 +1171,7 @@ def install_os(path=None, **kwargs):
         ret['message'] = 'Installation failed due to: "{0}"'.format(exception)
         ret['out'] = False
         return ret
-    finally:
-        if not no_copy_:
-            salt.utils.files.safe_rm(image_cached_path)
+    # No need to remove the cache file
 
     # Handle reboot, after the install has finished
     if reboot is True:
@@ -1180,7 +1190,7 @@ def install_os(path=None, **kwargs):
 
 def file_copy(src=None, dest=None):
     '''
-    Copies the file from the local device to the junos device
+    Copies the file from the master to the junos device
 
     src
         The source path where the file is kept.
@@ -1198,12 +1208,19 @@ def file_copy(src=None, dest=None):
     ret = {}
     ret['out'] = True
 
+    # First, copy the file from master to local
+
     if src is None:
         ret['message'] = \
-            'Please provide the absolute path of the file to be copied.'
+            'Please provide the path of the file to be copied.'
         ret['out'] = False
         return ret
-    if not os.path.isfile(src):
+
+    # cache_file is better suited here than get_file
+    cached_path = __salt__['cp.cache_file'](src)
+    # If it wasn't able find the file on master, it will return false
+    # else the cache path
+    if not cached_path and not os.path.isfile(src):
         ret['message'] = 'Invalid source file path'
         ret['out'] = False
         return ret
@@ -1216,7 +1233,7 @@ def file_copy(src=None, dest=None):
 
     try:
         with SCP(conn, progress=True) as scp:
-            scp.put(src, dest)
+            scp.put(cached_path, dest)
         ret['message'] = 'Successfully copied file from {0} to {1}'.format(
             src, dest)
     except Exception as exception:
@@ -1456,6 +1473,7 @@ def commit_check():
     return ret
 
 
+# TODO: this is the last module that is pending
 def get_table(table, table_file, path=None, target=None, key=None, key_items=None,
               filters=None, template_args=None):
     '''
