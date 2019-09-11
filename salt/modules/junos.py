@@ -1118,7 +1118,7 @@ def install_os(path=None, **kwargs):
         return ret
 
     if not no_copy_:
-        image_cached_path = __salt__['cp.get_file'](path)
+        image_cached_path = __salt__['cp.cache_file'](path)
 
         if not os.path.isfile(image_cached_path):
             ret['message'] = 'Invalid image path.'
