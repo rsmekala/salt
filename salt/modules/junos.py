@@ -1132,10 +1132,9 @@ def install_os(path=None, **kwargs):
             ret['message'] = 'Failed to copy image'
             ret['out'] = False
             return ret
-        path = image_cached_path
 
     try:
-        # conn.sw.install(path, progress=True, **op)
+        conn.sw.install(path, progress=True, **op)
         ret['message'] = 'Installed the os.'
     except Exception as exception:
         ret['message'] = 'Installation failed due to: "{0}"'.format(exception)
