@@ -781,7 +781,7 @@ def install_config(path=None, **kwargs):
     Commits the changes if the commit checks or throws an error.
 
     path (required)
-        Path where the configuration/template file is present. If the file has
+        Path where the configuration/template file is present on the master. If the file has
         a ``.conf`` extension, the content is treated as text format. If the
         file has a ``.xml`` extension, the content is treated as XML format. If
         the file has a ``.set`` extension, the content is treated as Junos OS
@@ -1051,7 +1051,7 @@ def install_os(path=None, **kwargs):
     if reboot=True is given as a keyworded argument.
 
     path (required)
-        Path where the image file is present on the proxy minion
+        Path where the image file is present on the master
 
     remote_path :
         If the value of path  is a file path on the local
@@ -1118,10 +1118,13 @@ def install_os(path=None, **kwargs):
         return ret
 
     if not no_copy_:
+        # Cache file is better suited here, it helps us preserve the
+        # extension of junos image
         image_cached_path = __salt__['cp.cache_file'](path)
+        log.debug("Path:" + image_cached_path)
 
-        if not os.path.isfile(image_cached_path):
-            ret['message'] = 'Invalid image path.'
+        if not image_cached_path and not os.path.isfile(image_cached_path):
+            ret['message'] = 'Invalid image path provided.'
             ret['out'] = False
             return ret
 
@@ -1138,9 +1141,7 @@ def install_os(path=None, **kwargs):
         ret['message'] = 'Installation failed due to: "{0}"'.format(exception)
         ret['out'] = False
         return ret
-    # finally:
-    #     if not no_copy_:
-    #         salt.utils.files.safe_rm(image_cached_path)
+    # There is no temp file to remove here
 
     if 'reboot' in op and op['reboot'] is True:
         try:
@@ -1161,7 +1162,7 @@ def file_copy(src=None, dest=None):
     Copies the file from the local device to the junos device
 
     src
-        The source path where the file is kept.
+        The source path where the file is kept on the master.
 
     dest
         The destination path on the where the file will be copied
@@ -1181,7 +1182,10 @@ def file_copy(src=None, dest=None):
             'Please provide the absolute path of the file to be copied.'
         ret['out'] = False
         return ret
-    if not os.path.isfile(src):
+
+    # Copy the file from master to the minion first
+    cached_path = __salt__['cp.cache_file'](src)
+    if not cached_path and not os.path.isfile(cached_path):
         ret['message'] = 'Invalid source file path'
         ret['out'] = False
         return ret
@@ -1194,7 +1198,8 @@ def file_copy(src=None, dest=None):
 
     try:
         with SCP(conn, progress=True) as scp:
-            scp.put(src, dest)
+            # Then copy the file from minion to device
+            scp.put(cached_path, dest)
         ret['message'] = 'Successfully copied file from {0} to {1}'.format(
             src, dest)
     except Exception as exception:
