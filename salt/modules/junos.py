@@ -1121,7 +1121,6 @@ def install_os(path=None, **kwargs):
         # Cache file is better suited here, it helps us preserve the
         # extension of junos image
         image_cached_path = __salt__['cp.cache_file'](path)
-        log.debug("Path:" + image_cached_path)
 
         if not image_cached_path and not os.path.isfile(image_cached_path):
             ret['message'] = 'Invalid image path provided.'
