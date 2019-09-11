@@ -1118,8 +1118,7 @@ def install_os(path=None, **kwargs):
         return ret
 
     if not no_copy_:
-        image_cached_path = salt.utils.files.mkstemp()
-        __salt__['cp.get_file'](path, image_cached_path)
+        image_cached_path = __salt__['cp.get_file'](path)
 
         if not os.path.isfile(image_cached_path):
             ret['message'] = 'Invalid image path.'
@@ -1133,15 +1132,15 @@ def install_os(path=None, **kwargs):
         path = image_cached_path
 
     try:
-        conn.sw.install(path, progress=True, **op)
+        # conn.sw.install(path, progress=True, **op)
         ret['message'] = 'Installed the os.'
     except Exception as exception:
         ret['message'] = 'Installation failed due to: "{0}"'.format(exception)
         ret['out'] = False
         return ret
-    finally:
-        if not no_copy_:
-            salt.utils.files.safe_rm(image_cached_path)
+    # finally:
+    #     if not no_copy_:
+    #         salt.utils.files.safe_rm(image_cached_path)
 
     if 'reboot' in op and op['reboot'] is True:
         try:
