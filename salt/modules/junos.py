@@ -1220,7 +1220,7 @@ def file_copy(src=None, dest=None):
     cached_path = __salt__['cp.cache_file'](src)
     # If it wasn't able find the file on master, it will return false
     # else the cache path
-    if not cached_path and not os.path.isfile(src):
+    if not cached_path and not os.path.isfile(cached_path):
         ret['message'] = 'Invalid source file path'
         ret['out'] = False
         return ret
@@ -1474,8 +1474,7 @@ def commit_check():
 
 
 # TODO: this is the last module that is pending
-def get_table(table, table_file, path=None, target=None, key=None, key_items=None,
-              filters=None, template_args=None):
+def get_table(table, table_file, **kwargs):
     '''
     Retrieve data from a Junos device using Tables/Views
 
@@ -1484,10 +1483,6 @@ def get_table(table, table_file, path=None, target=None, key=None, key_items=Non
 
     table_file (required)
         YAML file that has the table specified in table parameter
-
-    path:
-        Path of location of the YAML file.
-        defaults to op directory in jnpr.junos.op
 
     target:
         if command need to run on FPC, can specify fpc target
@@ -1515,33 +1510,68 @@ def get_table(table, table_file, path=None, target=None, key=None, key_items=Non
     ret['out'] = True
     ret['hostname'] = conn._hostname
     ret['tablename'] = table
-    get_kvargs = {}
-    if target is not None:
-        get_kvargs['target'] = target
-    if key is not None:
-        get_kvargs['key'] = key
-    if key_items is not None:
-        get_kvargs['key_items'] = key_items
-    if filters is not None:
-        get_kvargs['filters'] = filters
-    if template_args is not None and isinstance(template_args, dict):
-        get_kvargs['args'] = template_args
+
+    # path = None, target = None, key = None, key_items = None,
+    # filters = None, template_args = None
+
+    # TODO: Move this logic to one place instead of placing
+    # it in each and every module
+
+    # Update the kwargs to create a op dictionary, useful when
+    # executed with state module
+    op = {}
+    if '__pub_arg' in kwargs:
+        if kwargs['__pub_arg']:
+            if isinstance(kwargs['__pub_arg'][-1], dict):
+                op.update(kwargs['__pub_arg'][-1])
+    else:
+        op.update(kwargs)
+
+    # get_kvargs = {}
+    # if 'target' in op and op['target'] is not None:
+    #     get_kvargs['target'] = target
+    # if key is not None:
+    #     get_kvargs['key'] = key
+    # if key_items is not None:
+    #     get_kvargs['key_items'] = key_items
+    # if filters is not None:
+    #     get_kvargs['filters'] = filters
+    # if template_args is not None and isinstance(template_args, dict):
+    #     get_kvargs['args'] = template_args
     pyez_tables_path = os.path.dirname(os.path.abspath(tables_dir.__file__))
 
-    # First copy the tablefile here
+    # The key name has to be changed template_args -> args, if it exists
+    if 'template_args' in op and isinstance(op['template_args'], dict):
+        op['args'] = op['template_args']
+        del op['template_args']
+
+    # Find out where is the table_file on master or minion or non-existent
+    if os.path.isabs(table_file) or table_file.startswith('salt://'):
+        # In this case the table_file is present on
+        # First copy the tablefile here
+        table_file_loc = __salt__['cp.cache_file'](table_file)
+        # If it wasn't able find the file on master, it will return false
+        # else the cache path
+        if not table_file_loc and not os.path.isfile(table_file_loc):
+            ret['message'] = 'Invalid table file path'
+            ret['out'] = False
+            return ret
+    else:
+        table_file_loc = os.path.join(pyez_tables_path, '{}'.format(table_file))
+
     try:
-        if path is not None:
-            file_loc = glob.glob(os.path.join(path, '{}'.format(table_file)))
+        # Find if the file really exists,
+        # or the user is playing with the module :)
+        table_file_loc = glob.glob(table_file_loc)
+        if len(table_file_loc) == 1:
+            table_file_name = table_file_loc[0]
         else:
-            file_loc = glob.glob(os.path.join(pyez_tables_path, '{}'.format(table_file)))
-        if len(file_loc) == 1:
-            file_name = file_loc[0]
-        else:
+            # Caught you probably
             ret['message'] = 'Given table file {} cannot be located'.format(table_file)
             ret['out'] = False
             return ret
         try:
-            with salt.utils.files.fopen(file_name) as fp:
+            with salt.utils.files.fopen(table_file_name) as fp:
                 ret['table'] = yaml.load(fp.read(),
                                          Loader=yamlordereddictloader.Loader)
                 globals().update(FactoryLoader().load(ret['table']))
@@ -1552,7 +1582,7 @@ def get_table(table, table_file, path=None, target=None, key=None, key_items=Non
             return ret
         try:
             data = globals()[table](conn)
-            data.get(**get_kvargs)
+            data.get(**op)
         except KeyError as err:
             ret['message'] = 'Uncaught exception during get API call - please ' \
                              'report: {0}'.format(six.text_type(err))
@@ -1569,16 +1599,16 @@ def get_table(table, table_file, path=None, target=None, key=None, key_items=Non
             if ret['table'][table].get('key') is None:
                 ret['table'][table]['key'] = data.ITEM_NAME_XPATH
             # If key is provided from salt state file.
-            if key is not None:
+            if 'key' in op and op['key'] is not None:
                 ret['table'][table]['key'] = data.KEY
         else:
-            if target is not None:
+            if 'target' and op['target'] is not None:
                 ret['table'][table]['target'] = data.TARGET
-            if key is not None:
+            if 'key' in op and op['key'] is not None:
                 ret['table'][table]['key'] = data.KEY
-            if key_items is not None:
+            if 'key_items' and op['key_items'] is not None:
                 ret['table'][table]['key_items'] = data.KEY_ITEMS
-            if template_args is not None:
+            if 'args' in op and op['args'] is not None:
                 ret['table'][table]['args'] = data.CMD_ARGS
                 ret['table'][table]['command'] = data.GET_CMD
     except Exception as err:
