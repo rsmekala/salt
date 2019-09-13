@@ -1602,7 +1602,7 @@ def get_table(table, table_file, **kwargs):
             if 'key' in op and op['key'] is not None:
                 ret['table'][table]['key'] = data.KEY
         else:
-            if 'target' and op['target'] is not None:
+            if 'target' in op and op['target'] is not None:
                 ret['table'][table]['target'] = data.TARGET
             if 'key' in op and op['key'] is not None:
                 ret['table'][table]['key'] = data.KEY
