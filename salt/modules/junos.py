@@ -1606,7 +1606,7 @@ def get_table(table, table_file, **kwargs):
                 ret['table'][table]['target'] = data.TARGET
             if 'key' in op and op['key'] is not None:
                 ret['table'][table]['key'] = data.KEY
-            if 'key_items' and op['key_items'] is not None:
+            if 'key_items' in op and op['key_items'] is not None:
                 ret['table'][table]['key_items'] = data.KEY_ITEMS
             if 'args' in op and op['args'] is not None:
                 ret['table'][table]['args'] = data.CMD_ARGS
